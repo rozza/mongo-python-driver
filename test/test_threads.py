@@ -1,4 +1,4 @@
-# Copyright 2009-2010 10gen, Inc.
+# Copyright 2009-2012 10gen, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ import traceback
 
 from nose.plugins.skip import SkipTest
 
-from test.utils import server_started_with_auth
+from test.utils import server_started_with_auth, joinall
 from test.test_connection import get_connection
 from pymongo.connection import Connection
 from pymongo.replica_set_connection import ReplicaSetConnection
@@ -48,6 +48,7 @@ class AutoAuthenticateThreads(threading.Thread):
         self.coll = collection
         self.num = num
         self.success = True
+        self.setDaemon(True)
 
     def run(self):
         try:
@@ -64,6 +65,7 @@ class SaveAndFind(threading.Thread):
     def __init__(self, collection):
         threading.Thread.__init__(self)
         self.collection = collection
+        self.setDaemon(True)
 
     def run(self):
         sum = 0
@@ -79,6 +81,7 @@ class Insert(threading.Thread):
         self.collection = collection
         self.n = n
         self.expect_exception = expect_exception
+        self.setDaemon(True)
 
     def run(self):
         for _ in xrange(self.n):
@@ -102,6 +105,7 @@ class Update(threading.Thread):
         self.collection = collection
         self.n = n
         self.expect_exception = expect_exception
+        self.setDaemon(True)
 
     def run(self):
         for _ in xrange(self.n):
@@ -125,6 +129,7 @@ class IgnoreAutoReconnect(threading.Thread):
         threading.Thread.__init__(self)
         self.c = collection
         self.n = n
+        self.setDaemon(True)
 
     def run(self):
         for _ in range(self.n):
@@ -249,8 +254,7 @@ class BaseTestThreads(object):
             t.start()
             threads.append(t)
 
-        for t in threads:
-            t.join()
+        joinall(threads)
 
     def test_safe_insert(self):
         self.db.drop_collection("test1")
@@ -308,8 +312,7 @@ class BaseTestThreads(object):
             t.start()
             threads.append(t)
 
-        for t in threads:
-            t.join()
+        joinall(threads)
 
     def test_server_disconnect(self):
         # PYTHON-345, we need to make sure that threads' request sockets are
@@ -350,7 +353,7 @@ class BaseTestThreads(object):
             t.start()
 
         # Wait for the threads to reach the rendezvous
-        state.ev_arrived.wait(1)
+        state.ev_arrived.wait(10)
         self.assertTrue(state.ev_arrived.isSet(), "Thread timeout")
 
         try:
@@ -360,6 +363,11 @@ class BaseTestThreads(object):
             for t in threads:
                 t.request_sock.close()
 
+            # Finally, ensure the main thread's socket's last_checkout is
+            # updated:
+            collection.find_one()
+
+            # ... and close it:
             request_sock.close()
 
             # Doing an operation on the connection raises an AutoReconnect and
@@ -370,9 +378,7 @@ class BaseTestThreads(object):
             # Let threads do a second find()
             state.ev_resume.set()
 
-        for t in threads:
-            t.join(1)
-            self.assertFalse(t.isAlive(), "Thread timeout")
+        joinall(threads)
 
         for t in threads:
             self.assertTrue(t.passed, "%s threw exception" % t)
@@ -424,8 +430,10 @@ class BaseTestThreadsAuth(object):
             t = AutoAuthenticateThreads(conn.auth_test.test, 100)
             t.start()
             threads.append(t)
+
+        joinall(threads)
+
         for t in threads:
-            t.join()
             self.assertTrue(t.success)
 
         # Database-specific auth
@@ -437,8 +445,10 @@ class BaseTestThreadsAuth(object):
             t = AutoAuthenticateThreads(conn.auth_test.test, 100)
             t.start()
             threads.append(t)
+
+        joinall(threads)
+
         for t in threads:
-            t.join()
             self.assertTrue(t.success)
 
 class TestThreads(BaseTestThreads, unittest.TestCase):

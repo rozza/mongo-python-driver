@@ -1,4 +1,4 @@
-# Copyright 2009-2010 10gen, Inc.
+# Copyright 2009-2012 10gen, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -274,20 +274,24 @@ class TestMasterSlaveConnection(unittest.TestCase):
         c = self.connection
         c.slave_okay = True
         db = c.pymongo_test
-        db.drop_collection("test")
 
-        test = db.test
-        test.insert(
-            [{"i": i} for i in range(20)], w=1 + len(self.slaves))
+        test = db.master_slave_test_kill_cursor_explicit
+        test.drop()
+
+        for i in range(20):
+            test.insert({"i": i}, w=1 + len(self.slaves))
 
         st = time.time()
-        while time.time() - st < 30:
+        while time.time() - st < 120:
             # Wait for replication -- the 'w' parameter should obviate this
-            # loop but it's not working in Jenkins right now
-            if len(list(test.find())) == 20:
+            # loop but it's not working reliably in Jenkins right now
+            if list(test.find({"i": 19})):
                 break
+            time.sleep(0.5)
         else:
-            self.fail("Replication timeout")
+            self.fail("Replication timeout, test coll has %s records" % (
+                len(list(test.find()))
+            ))
 
         # Partially evaluate cursor so it's left alive, then kill it
         cursor = test.find().batch_size(10)

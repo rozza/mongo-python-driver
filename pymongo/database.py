@@ -1,4 +1,4 @@
-# Copyright 2009-2010 10gen, Inc.
+# Copyright 2009-2012 10gen, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -34,7 +34,7 @@ def _check_name(name):
     if not name:
         raise InvalidName("database name cannot be the empty string")
 
-    for invalid_char in [" ", ".", "$", "/", "\\"]:
+    for invalid_char in [" ", ".", "$", "/", "\\", "\x00"]:
         if invalid_char in name:
             raise InvalidName("database names cannot contain the "
                               "character %r" % invalid_char)
@@ -226,7 +226,7 @@ class Database(common.BaseObject):
           - `**kwargs` (optional): additional keyword arguments will
             be passed as options for the create collection command
 
-        .. versionchanged:: 2.1.1+
+        .. versionchanged:: 2.2
            Removed deprecated argument: options
 
         .. versionchanged:: 1.5
@@ -316,7 +316,7 @@ class Database(common.BaseObject):
           - `**kwargs` (optional): additional keyword arguments will
             be added to the command document before it is sent
 
-        .. versionchanged:: 2.1.1+
+        .. versionchanged:: 2.2
            Added support for `as_class` - the class you want to use for
            the resulting documents
         .. versionchanged:: 1.6
@@ -559,7 +559,7 @@ class Database(common.BaseObject):
           - `password`: the password of the user to create
           - `read_only` (optional): if ``True`` it will make user read only
 
-        .. versionchanged:: 2.1.1+
+        .. versionchanged:: 2.2
            Added support for read only users
 
         .. versionadded:: 1.4

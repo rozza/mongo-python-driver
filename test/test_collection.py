@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright 2009-2010 10gen, Inc.
+# Copyright 2009-2012 10gen, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -44,6 +44,7 @@ from pymongo.errors import (ConfigurationError,
                             OperationFailure,
                             TimeoutError)
 from test.test_connection import get_connection
+from test.utils import joinall
 from test import (qcheck,
                   version)
 
@@ -61,6 +62,7 @@ class TestCollection(unittest.TestCase):
         self.db = self.connection.pymongo_test
 
     def tearDown(self):
+        self.db.drop_collection("test_large_limit")
         self.db = None
         self.connection = None
 
@@ -218,13 +220,13 @@ class TestCollection(unittest.TestCase):
         threads = []
         for _ in xrange(10):
             t = Indexer()
+            t.setDaemon(True)
             threads.append(t)
 
         for i in xrange(10):
             threads[i].start()
 
-        for i in xrange(10):
-            threads[i].join()
+        joinall(threads)
 
         self.assertEqual(10001, coll.count())
         coll.drop()
@@ -632,17 +634,17 @@ class TestCollection(unittest.TestCase):
 
     def test_invalid_key_names(self):
         db = self.db
-        db.test.remove({})
+        db.test.drop()
 
-        db.test.insert({"hello": "world"})
-        db.test.insert({"hello": {"hello": "world"}})
+        db.test.insert({"hello": "world"}, safe=True)
+        db.test.insert({"hello": {"hello": "world"}}, safe=True)
 
         self.assertRaises(InvalidDocument, db.test.insert, {"$hello": "world"})
         self.assertRaises(InvalidDocument, db.test.insert,
                           {"hello": {"$hello": "world"}})
 
-        db.test.insert({"he$llo": "world"})
-        db.test.insert({"hello": {"hello$": "world"}})
+        db.test.insert({"he$llo": "world"}, safe=True)
+        db.test.insert({"hello": {"hello$": "world"}}, safe=True)
 
         self.assertRaises(InvalidDocument, db.test.insert,
                           {".hello": "world"})
@@ -665,7 +667,7 @@ class TestCollection(unittest.TestCase):
         doc1 = {"hello": u"world"}
         doc2 = {"hello": u"mike"}
         self.assertEqual(db.test.find().count(), 0)
-        ids = db.test.insert([doc1, doc2])
+        ids = db.test.insert([doc1, doc2], safe=True)
         self.assertEqual(db.test.find().count(), 2)
         self.assertEqual(doc1, db.test.find_one({"hello": u"world"}))
         self.assertEqual(doc2, db.test.find_one({"hello": u"mike"}))
@@ -690,7 +692,7 @@ class TestCollection(unittest.TestCase):
         db.test.remove()
 
         # No error
-        db.test.insert([{'i': 1}] * 2)
+        db.test.insert([{'i': 1}] * 2, safe=False)
         self.assertEqual(1, db.test.count())
 
         self.assertRaises(
@@ -1178,22 +1180,31 @@ class TestCollection(unittest.TestCase):
 
     def test_large_limit(self):
         db = self.db
-        db.test.remove({}, safe=True)
-        db.drop_collection("test")
+        db.drop_collection("test_large_limit")
+        db.test_large_limit.create_index([('x', 1)])
 
         for i in range(2000):
-            db.test.insert({"x": i, "y": "mongomongo" * 1000}, safe=True)
+            doc = {"x": i, "y": "mongomongo" * 1000}
+            db.test_large_limit.insert(doc, safe=True)
 
-        self.assertEqual(2000, len(list(db.test.find())))
+        # Wait for insert to complete; often mysteriously failing in Jenkins
+        st = time.time()
+        while (
+            len(list(db.test_large_limit.find())) < 2000
+            and time.time() - st < 30
+        ):
+            time.sleep(1)
+
+        self.assertEqual(2000, len(list(db.test_large_limit.find())))
 
         i = 0
         y = 0
-        for doc in db.test.find(limit=1900):
+        for doc in db.test_large_limit.find(limit=1900).sort([('x', 1)]):
             i += 1
             y += doc["x"]
 
         self.assertEqual(1900, i)
-        self.assertEqual(1804050, y)
+        self.assertEqual((1900 * 1899) / 2, y)
 
     def test_find_kwargs(self):
         db = self.db

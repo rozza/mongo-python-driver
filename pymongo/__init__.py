@@ -1,4 +1,4 @@
-# Copyright 2009-2010 10gen, Inc.
+# Copyright 2009-2012 10gen, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -91,11 +91,11 @@ class ReadPreference:
     SECONDARY = 1
     SECONDARY_ONLY = 2
 
-version_tuple = (2, 1, 1, '+')
+version_tuple = (2, 2, '+')
 
 def get_version_string():
-    if version_tuple[-1] == '+':
-        return '.'.join(map(str, version_tuple[:-1])) + '+'
+    if isinstance(version_tuple[-1], basestring):
+        return '.'.join(map(str, version_tuple[:-1])) + version_tuple[-1]
     return '.'.join(map(str, version_tuple))
 
 version = get_version_string()

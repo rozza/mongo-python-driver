@@ -1,4 +1,4 @@
-# Copyright 2009-2010 10gen, Inc.
+# Copyright 2009-2012 10gen, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -60,7 +60,7 @@ class Collection(common.BaseObject):
           - `**kwargs` (optional): additional keyword arguments will
             be passed as options for the create collection command
 
-        .. versionchanged:: 2.1.1+
+        .. versionchanged:: 2.2
            Removed deprecated argument: options
 
         .. versionadded:: 2.1
@@ -670,7 +670,7 @@ class Collection(common.BaseObject):
             options (see the above list) should be passed as keyword
             arguments
 
-        .. versionchanged:: 2.1.1+
+        .. versionchanged:: 2.2
            Removed deprecated argument: deprecated_unique
 
         .. versionchanged:: 1.5.1
@@ -761,7 +761,7 @@ class Collection(common.BaseObject):
             options (see the above list) should be passed as keyword
             arguments
 
-        .. versionchanged:: 2.1.1+
+        .. versionchanged:: 2.2
            Removed deprecated argument: deprecated_unique
 
         .. versionchanged:: 1.5.1
@@ -964,7 +964,7 @@ class Collection(common.BaseObject):
           - `reduce`: aggregation function as a JavaScript string
           - `finalize`: function to be called on each object in output list.
 
-        .. versionchanged:: 2.1.1+
+        .. versionchanged:: 2.2
            Removed deprecated argument: command
 
         .. versionchanged:: 1.4
@@ -1076,7 +1076,7 @@ class Collection(common.BaseObject):
 
         .. seealso:: :doc:`/examples/map_reduce`
 
-        .. versionchanged:: 2.1.1+
+        .. versionchanged:: 2.2
            Removed deprecated arguments: merge_output and reduce_output
 
         .. versionchanged:: 1.11+

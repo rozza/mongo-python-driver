@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# Copyright 2009-2010 10gen, Inc.
+# Copyright 2009-2012 10gen, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -34,6 +34,7 @@ from bson.py3compat import b
 from gridfs.errors import (FileExists,
                            NoFile)
 from test.test_connection import get_connection
+from test.utils import joinall
 
 
 class JustWrite(threading.Thread):
@@ -42,6 +43,7 @@ class JustWrite(threading.Thread):
         threading.Thread.__init__(self)
         self.fs = fs
         self.n = n
+        self.setDaemon(True)
 
     def run(self):
         for _ in range(self.n):
@@ -57,6 +59,7 @@ class JustRead(threading.Thread):
         self.fs = fs
         self.n = n
         self.results = results
+        self.setDaemon(True)
 
     def run(self):
         for _ in range(self.n):
@@ -154,8 +157,7 @@ class TestGridfs(unittest.TestCase):
             threads.append(JustRead(self.fs, 10, results))
             threads[i].start()
 
-        for i in range(10):
-            threads[i].join()
+        joinall(threads)
 
         self.assertEqual(
             100 * [b('hello')],
@@ -168,8 +170,7 @@ class TestGridfs(unittest.TestCase):
             threads.append(JustWrite(self.fs, 10))
             threads[i].start()
 
-        for i in range(10):
-            threads[i].join()
+        joinall(threads)
 
         f = self.fs.get_last_version("test")
         self.assertEqual(f.read(), b("hello"))

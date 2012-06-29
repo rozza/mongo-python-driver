@@ -31,7 +31,7 @@ from distutils.errors import CCompilerError
 from distutils.errors import DistutilsPlatformError, DistutilsExecError
 from distutils.core import Extension
 
-version = "2.1.1+"
+version = "2.2+"
 
 f = open("README.rst")
 try:
@@ -125,21 +125,25 @@ class custom_build_ext(build_ext):
     """
 
     warning_message = """
-**************************************************************
+********************************************************************
 WARNING: %s could not
 be compiled. No C extensions are essential for PyMongo to run,
 although they do result in significant speed improvements.
 
 If you are seeing this message on Linux you probably need to
 install GCC and/or the Python development package for your
-version of Python. Python development package names for popular
-Linux distributions include:
+version of Python.
 
-RHEL/CentOS: python-devel
-Debian/Ubuntu: python-dev
+Debian and Ubuntu users should issue the following command:
+
+    $ sudo apt-get install build-essential python-dev
+
+RedHat, CentOS, and Fedora users should issue the following command:
+
+    $ sudo yum install gcc python-devel
 
 %s
-**************************************************************
+********************************************************************
 """
 
     def run(self):
@@ -273,10 +277,12 @@ setup(
         "Operating System :: MacOS :: MacOS X",
         "Operating System :: Microsoft :: Windows",
         "Operating System :: POSIX",
+        "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 2.4",
         "Programming Language :: Python :: 2.5",
         "Programming Language :: Python :: 2.6",
         "Programming Language :: Python :: 2.7",
+        "Programming Language :: Python :: 3",
         "Programming Language :: Python :: 3.1",
         "Programming Language :: Python :: 3.2",
         "Programming Language :: Python :: Implementation :: CPython",

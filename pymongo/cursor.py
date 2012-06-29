@@ -1,4 +1,4 @@
-# Copyright 2009-2010 10gen, Inc.
+# Copyright 2009-2012 10gen, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -307,7 +307,14 @@ class Cursor(object):
         return self
 
     def batch_size(self, batch_size):
-        """Set the size for batches of results returned by this cursor.
+        """Limits the number of documents returned in one batch. Each batch
+        requires a round trip to the server. It can be adjusted to optimize
+        performance and limit data transfer.
+
+        .. note:: batch_size can not override MongoDB's internal limits on the
+           amount of data it will return to the client in a single batch (i.e
+           if you set batch size to 1,000,000,000, MongoDB will currently only
+           return 4-16MB of results per batch).
 
         Raises :class:`TypeError` if `batch_size` is not an instance
         of :class:`int`. Raises :class:`ValueError` if `batch_size` is
@@ -626,8 +633,16 @@ class Cursor(object):
             kwargs["_connection_to_use"] = self.__connection_id
         kwargs.update(self.__kwargs)
 
-        response = db.connection._send_message_with_response(message,
-                                                             **kwargs)
+        try:
+            response = db.connection._send_message_with_response(message,
+                                                                 **kwargs)
+        except AutoReconnect:
+            # Don't try to send kill cursors on another socket
+            # or to another server. It can cause a _pinValue
+            # assertion on some server releases if we get here
+            # due to a socket timeout.
+            self.__killed = True
+            raise
 
         if isinstance(response, tuple):
             (connection_id, response) = response
@@ -641,13 +656,18 @@ class Cursor(object):
                                                 self.__as_class,
                                                 self.__tz_aware)
         except AutoReconnect:
+            # Don't send kill cursors to another server after a "not master"
+            # error. It's completely pointless.
+            self.__killed = True
             db.connection.disconnect()
             raise
         self.__id = response["cursor_id"]
 
         # starting from doesn't get set on getmore's for tailable cursors
         if not self.__tailable:
-            assert response["starting_from"] == self.__retrieved
+            assert response["starting_from"] == self.__retrieved, (
+                "Result batch started from %s, expected %s" % (
+                    response['starting_from'], self.__retrieved))
 
         self.__retrieved += response["number_returned"]
         self.__data = response["data"]
@@ -715,7 +735,7 @@ class Cursor(object):
         cursors manually using
         :meth:`~pymongo.connection.Connection.kill_cursors`
 
-        .. versionadded:: 2.1.1+
+        .. versionadded:: 2.2
         """
         return self.__id
 

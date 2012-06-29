@@ -1,4 +1,4 @@
-# Copyright 2009-2010 10gen, Inc.
+# Copyright 2009-2012 10gen, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you
 # may not use this file except in compliance with the License.  You
@@ -166,8 +166,9 @@ class Connection(common.BaseObject):
             instead.
 
         .. seealso:: :meth:`end_request`
-        .. versionchanged:: 2.1.1+
-           Added `auto_start_request` option back.
+        .. versionchanged:: 2.2
+           Added `auto_start_request` option back. Added `use_greenlets`
+           option.
         .. versionchanged:: 2.1
            Support `w` = integer or string.
            Added `ssl` option.
@@ -740,7 +741,7 @@ class Connection(common.BaseObject):
                                                             sock_info)
                 rv = self.__check_response_to_last_error(response)
 
-            self.__pool.return_socket(sock_info)
+            self.__pool.maybe_return_socket(sock_info)
             return rv
         except (ConnectionFailure, socket.error), e:
             self.disconnect()
@@ -757,8 +758,7 @@ class Connection(common.BaseObject):
             try:
                 chunk = sock_info.sock.recv(length)
             except:
-                # If recv was interrupted, discard the socket
-                # and re-raise the exception.
+                # recv was interrupted
                 self.__pool.discard_socket(sock_info)
                 raise
             if chunk == EMPTY:
@@ -815,12 +815,12 @@ class Connection(common.BaseObject):
                     # Restore the socket's original timeout and return it to
                     # the pool
                     sock_info.sock.settimeout(self.__net_timeout)
-                    self.__pool.return_socket(sock_info)
+                    self.__pool.maybe_return_socket(sock_info)
                 except socket.error:
                     # There was an exception and we've closed the socket
                     pass
             else:
-                self.__pool.return_socket(sock_info)
+                self.__pool.maybe_return_socket(sock_info)
 
     def start_request(self):
         """Ensure the current thread or greenlet always uses the same socket
@@ -841,7 +841,7 @@ class Connection(common.BaseObject):
         ...     # Definitely read the document after the final update completes
         ...     print db.test_collection.find({'_id': _id})
 
-        .. versionadded:: 2.1.1+
+        .. versionadded:: 2.2
            The :class:`~pymongo.pool.Request` return value.
            :meth:`start_request` previously returned None
         """

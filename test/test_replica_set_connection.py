@@ -1,4 +1,4 @@
-# Copyright 2009-2011 10gen, Inc.
+# Copyright 2011-2012 10gen, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -541,7 +541,7 @@ class TestConnection(TestConnectionReplicaSetBase):
             self.assertEqual(connection_id, writer, msg)
         else:
             self.assertNotEqual(connection_id, writer,
-                "Expected cursor's connection_id not to be -1")
+                "Expected cursor's connection_id not to be primary")
 
         cursor_id = cursor.cursor_id
 

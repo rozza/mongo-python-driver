@@ -1,4 +1,4 @@
-# Copyright 2009-2010 10gen, Inc.
+# Copyright 2009-2012 10gen, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -130,6 +130,8 @@ class TestConnection(unittest.TestCase):
 
         self.assertRaises(TypeError, connection.drop_database, 5)
         self.assertRaises(TypeError, connection.drop_database, None)
+
+        raise SkipTest("This test often fails due to SERVER-2329")
 
         connection.pymongo_test.test.save({"dummy": u"object"})
         dbs = connection.database_names()
@@ -500,6 +502,8 @@ with get_connection() as connection:
         sock_info0 = self.get_sock(pool)
         sock_info1 = self.get_sock(pool)
         self.assertEqual(sock_info0, sock_info1)
+        pool.maybe_return_socket(sock_info0)
+        pool.maybe_return_socket(sock_info1)
 
     def assertDifferentSock(self, pool):
         # We have to hold both SocketInfos at the same time, otherwise the
@@ -509,6 +513,8 @@ with get_connection() as connection:
         sock_info0 = self.get_sock(pool)
         sock_info1 = self.get_sock(pool)
         self.assertNotEqual(sock_info0, sock_info1)
+        pool.maybe_return_socket(sock_info0)
+        pool.maybe_return_socket(sock_info1)
 
     def assertNoRequest(self, pool):
         self.assertEqual(NO_REQUEST, pool._get_request_state())

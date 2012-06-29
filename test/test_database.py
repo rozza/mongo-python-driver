@@ -1,4 +1,4 @@
-# Copyright 2009-2010 10gen, Inc.
+# Copyright 2009-2012 10gen, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -52,6 +52,9 @@ class TestDatabase(unittest.TestCase):
     def test_name(self):
         self.assertRaises(TypeError, Database, self.connection, 4)
         self.assertRaises(InvalidName, Database, self.connection, "my db")
+        self.assertRaises(InvalidName, Database, self.connection, "my\x00db")
+        self.assertRaises(InvalidName, Database,
+                          self.connection, u"my\u0000db")
         self.assertEqual("name", Database(self.connection, "name").name)
 
     def test_cmp(self):

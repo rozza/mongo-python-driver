@@ -1,4 +1,4 @@
-# Copyright 2009-2011 10gen, Inc.
+# Copyright 2011-2012 10gen, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you
 # may not use this file except in compliance with the License.  You
@@ -71,7 +71,7 @@ def parse_userinfo(userinfo):
     :Paramaters:
         - `userinfo`: A string of the form <username>:<password>
 
-    .. versionchanged:: 2.1.1+
+    .. versionchanged:: 2.2
        Now uses `urllib.unquote_plus` so `+` characters must be escaped.
     """
     if '@' in userinfo or userinfo.count(':') > 1:
