@@ -889,6 +889,49 @@ class Collection(common.BaseObject):
 
         return options
 
+    def aggregate(self, pipeline, full_response=False, explain=False):
+        """Perform an aggregation using the aggregation framework on this
+        collection.
+
+        If `full_response` is ``False`` (default) returns the
+        result documents in a list. Otherwise, returns the full
+        response from the server to the `aggregate command`_.
+
+        :Parameters:
+          - `pipeline`: a dictionary or array of dictionary aggregation commands
+          - `full_response` (optional): if ``True``, return full response to
+            this command - otherwise just return the result collection
+          - `explain` - return explain plan for the aggregation
+
+        .. note:: Requires server version **>= 2.1.2**
+
+        .. seealso:: :doc:`/examples/map_reduce`
+
+        .. versionadded:: 2.1.1+
+
+        .. _aggregate command:
+            http://docs.mongodb.org/manual/applications/aggregation
+
+        .. mongodoc:: aggregationframework
+        """
+        if not isinstance(pipeline, (dict, list, tuple, set)):
+            raise TypeError("pipeline must be a dict, list, tuple or set")
+        if not isinstance(full_response, bool):
+            raise TypeError("full_response must be an instance of bool")
+        if not isinstance(explain, bool):
+            raise TypeError("explain must be an instance of bool")
+
+        if isinstance(pipeline, dict):
+            pipeline = [pipeline]
+
+        res = self.__database.command("aggregate", self.__name,
+                                      pipeline=pipeline, explain=explain)
+
+        if not full_response:
+            res = res.get("serverPipeline") if explain else res.get("result")
+
+        return res
+
     # TODO key and condition ought to be optional, but deprecation
     # could be painful as argument order would have to change.
     def group(self, key, condition, initial, reduce, finalize=None):

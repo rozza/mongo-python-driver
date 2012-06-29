@@ -1045,6 +1045,31 @@ class TestCollection(unittest.TestCase):
         self.assertEqual(db.test.find({'foo': 'bar'}).count(), 1)
         self.assertEqual(db.test.find({'foo': re.compile(r'ba.*')}).count(), 2)
 
+    def test_aggregate(self):
+        db = self.db
+        db.drop_collection("test")
+        db.test.save({'foo': [1, 2]})
+
+        self.assertRaises(TypeError, db.test.aggregate, "wow")
+        self.assertRaises(TypeError, db.test.aggregate, [], 1)
+        self.assertRaises(TypeError, db.test.aggregate, [], True, 1)
+
+        pipeline = {"$project": {"_id": False, "foo": True}}
+        expected = {'ok': 1.0, 'result': [{'foo': [1, 2]}]}
+        self.assertEqual(db.test.aggregate(pipeline), expected['result'])
+        self.assertEqual(db.test.aggregate([pipeline]), expected['result'])
+        self.assertEqual(db.test.aggregate((pipeline,)), expected['result'])
+
+        self.assertEqual(db.test.aggregate(pipeline, True), expected)
+        self.assertEqual(db.test.aggregate([pipeline], True), expected)
+
+        result = db.test.aggregate(pipeline, full_response=True, explain=True)
+        self.assertTrue('serverPipeline' in
+                            db.test.aggregate(pipeline, True, True))
+
+        result = db.test.aggregate(pipeline, full_response=False, explain=True)
+        self.assertTrue(isinstance(result, list))
+
     def test_group(self):
         db = self.db
         db.drop_collection("test")
