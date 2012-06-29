@@ -119,6 +119,7 @@ class Cursor(object):
         self.__query_flags = 0
 
         self.__data = []
+        self.__data_p = 0
         self.__connection_id = None
         self.__retrieved = 0
         self.__killed = False
@@ -150,6 +151,7 @@ class Cursor(object):
         retrieved by this cursor.
         """
         self.__data = []
+        self.__data_p = 0
         self.__id = None
         self.__connection_id = None
         self.__retrieved = 0
@@ -671,6 +673,7 @@ class Cursor(object):
 
         self.__retrieved += response["number_returned"]
         self.__data = response["data"]
+        self.__data_p = 0
 
         if self.__limit and self.__id and self.__limit <= self.__retrieved:
             self.__die()
@@ -682,8 +685,8 @@ class Cursor(object):
         self.__data is already non-empty. Raises OperationFailure when the
         cursor cannot be refreshed due to an error on the query.
         """
-        if len(self.__data) or self.__killed:
-            return len(self.__data)
+        if (len(self.__data) - self.__data_p) or self.__killed:
+            return len(self.__data) - self.__data_p
 
         if self.__id is None:  # Query
             ntoreturn = self.__batch_size
@@ -712,7 +715,7 @@ class Cursor(object):
                 message.get_more(self.__collection.full_name,
                                  limit, self.__id))
 
-        return len(self.__data)
+        return len(self.__data) - self.__data_p
 
     @property
     def alive(self):
@@ -725,7 +728,7 @@ class Cursor(object):
 
         .. versionadded:: 1.5
         """
-        return bool(len(self.__data) or (not self.__killed))
+        return bool((len(self.__data)-self.__data_p) or (not self.__killed))
 
     @property
     def cursor_id(self):
@@ -746,11 +749,14 @@ class Cursor(object):
         if self.__empty:
             raise StopIteration
         db = self.__collection.database
-        if len(self.__data) or self._refresh():
+        if (len(self.__data) - self.__data_p) or self._refresh():
+            item = self.__data[self.__data_p]
+            self.__data_p += 1
+
             if self.__manipulate:
-                return db._fix_outgoing(self.__data.pop(0), self.__collection)
+                return db._fix_outgoing(item, self.__collection)
             else:
-                return self.__data.pop(0)
+                return item
         else:
             raise StopIteration
 
