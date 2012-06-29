@@ -15,7 +15,7 @@ framework.
 
     Aggregation requires server version **>= 2.1.2**. The PyMongo
     :meth:`~pymongo.collection.Collection.aggregate` helper requires
-    PyMongo version **>= 2.1.1+**.
+    PyMongo version **>= 2.2+**.
 
 Setup
 -----

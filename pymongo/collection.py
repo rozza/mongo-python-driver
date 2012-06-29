@@ -905,14 +905,10 @@ class Collection(common.BaseObject):
 
         .. note:: Requires server version **>= 2.1.2**
 
-        .. seealso:: :doc:`/examples/map_reduce`
-
-        .. versionadded:: 2.1.1+
+        .. versionadded:: 2.2+
 
         .. _aggregate command:
             http://docs.mongodb.org/manual/applications/aggregation
-
-        .. mongodoc:: aggregationframework
         """
         if not isinstance(pipeline, (dict, list, tuple, set)):
             raise TypeError("pipeline must be a dict, list, tuple or set")
