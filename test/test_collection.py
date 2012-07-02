@@ -1058,18 +1058,19 @@ class TestCollection(unittest.TestCase):
 
         pipeline = {"$project": {"_id": False, "foo": True}}
         expected = {'ok': 1.0, 'result': [{'foo': [1, 2]}]}
-        self.assertEqual(db.test.aggregate(pipeline), expected['result'])
-        self.assertEqual(db.test.aggregate([pipeline]), expected['result'])
-        self.assertEqual(db.test.aggregate((pipeline,)), expected['result'])
+        self.assertEqual(expected['result'], db.test.aggregate(pipeline))
+        self.assertEqual(expected['result'], db.test.aggregate([pipeline]))
+        self.assertEqual(expected['result'], db.test.aggregate((pipeline,)))
 
-        self.assertEqual(db.test.aggregate(pipeline, True), expected)
-        self.assertEqual(db.test.aggregate([pipeline], True), expected)
+        self.assertEqual(expected,
+                         db.test.aggregate(pipeline, full_response=True))
+        self.assertEqual(expected,
+                         db.test.aggregate([pipeline], full_response=True))
 
-        result = db.test.aggregate(pipeline, full_response=True, explain=True)
-        self.assertTrue('serverPipeline' in
-                            db.test.aggregate(pipeline, True, True))
+        result = db.test.aggregate(pipeline, explain=True, full_response=True)
+        self.assertTrue('serverPipeline' in result)
 
-        result = db.test.aggregate(pipeline, full_response=False, explain=True)
+        result = db.test.aggregate(pipeline, explain=True, full_response=False)
         self.assertTrue(isinstance(result, list))
 
     def test_group(self):

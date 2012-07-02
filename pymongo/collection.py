@@ -889,7 +889,7 @@ class Collection(common.BaseObject):
 
         return options
 
-    def aggregate(self, pipeline, full_response=False, explain=False):
+    def aggregate(self, pipeline, explain=False, full_response=False):
         """Perform an aggregation using the aggregation framework on this
         collection.
 
@@ -898,20 +898,20 @@ class Collection(common.BaseObject):
         response from the server to the `aggregate command`_.
 
         :Parameters:
-          - `pipeline`: a dictionary or array of dictionary aggregation commands
+          - `pipeline`: a single command or list of aggregation commands
           - `full_response` (optional): if ``True``, return full response to
-            this command - otherwise just return the result collection
+            this command - otherwise just return the result
           - `explain` - return explain plan for the aggregation
 
-        .. note:: Requires server version **>= 2.1.2**
+        .. note:: Requires server version **>= 2.1.1**
 
-        .. versionadded:: 2.2+
+        .. versionadded:: 2.2.1+
 
         .. _aggregate command:
             http://docs.mongodb.org/manual/applications/aggregation
         """
-        if not isinstance(pipeline, (dict, list, tuple, set)):
-            raise TypeError("pipeline must be a dict, list, tuple or set")
+        if not isinstance(pipeline, (dict, list, tuple)):
+            raise TypeError("pipeline must be a dict, list or tuple")
         if not isinstance(full_response, bool):
             raise TypeError("full_response must be an instance of bool")
         if not isinstance(explain, bool):

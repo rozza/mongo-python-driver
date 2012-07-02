@@ -13,9 +13,9 @@ framework.
 
 .. note::
 
-    Aggregation requires server version **>= 2.1.2**. The PyMongo
+    Aggregation requires server version **>= 2.1.1**. The PyMongo
     :meth:`~pymongo.collection.Collection.aggregate` helper requires
-    PyMongo version **>= 2.2+**.
+    PyMongo version **>= 2.2.1+**.
 
 Setup
 -----
@@ -45,16 +45,20 @@ unwind the ``tags`` array and then group by the tags and sum them up.
 
 .. doctest::
 
-  >>> db.things.aggregate([{"$unwind": "$tags"},
-  ...                      {"$group": {"_id": "$tags",
-  ...                       "count": {"$sum": 1}}}])
+  >>> db.things.aggregate([
+  ...         {"$unwind": "$tags"},
+  ...         {"$group": {"_id": "$tags", "count": {"$sum": 1}}},
+  ...         {"$sort": {"count": -1, "_id": -1}}
+  ...     ])
   ...
-  [{'_id': 'mouse', 'count': 1},
-   {'_id': 'cat', 'count': 3},
-   {'_id': 'dog', 'count': 2}]
+[{u'_id': u'cat', u'count': 3},
+ {u'_id': u'dog', u'count': 2},
+ {u'_id': u'mouse', u'count': 1},
+ {u'_id': None, u'count': 1}]
 
 
-As well as simple aggregations the aggregation framework provides projection capabilities to reshape the returned data. Using projections and aggregation,
+As well as simple aggregations the aggregation framework provides projection
+capabilities to reshape the returned data. Using projections and aggregation,
 you can add computed fields, create new virtual sub-objects, and extract
 sub-fields into the top-level of results.
 
