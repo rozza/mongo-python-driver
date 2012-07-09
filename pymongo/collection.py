@@ -913,7 +913,7 @@ class Collection(common.BaseObject):
         if isinstance(ops, dict):
             ops = [ops]
 
-        return = self.__database.command("aggregate", self.__name, pipeline=ops)
+        return self.__database.command("aggregate", self.__name, pipeline=ops)
 
 
     # TODO key and condition ought to be optional, but deprecation

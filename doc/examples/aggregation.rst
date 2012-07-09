@@ -54,10 +54,12 @@ sum them up.
   ...         {"$sort": {"count": -1, "_id": -1}}
   ...     ])
   ...
-[{u'_id': u'cat', u'count': 3},
- {u'_id': u'dog', u'count': 2},
- {u'_id': u'mouse', u'count': 1},
- {u'_id': None, u'count': 1}]
+  {u'ok': 1.0,
+   u'result': [
+    {u'_id': u'cat', u'count': 3},
+    {u'_id': u'dog', u'count': 2},
+    {u'_id': u'mouse', u'count': 1},
+    {u'_id': None, u'count': 1}]}
 
 
 As well as simple aggregations the aggregation framework provides projection
