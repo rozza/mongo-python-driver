@@ -157,7 +157,7 @@ different database to store the result collection:
 Group
 -----
 
-The group() command provides some of the same functionality as SQL’s GROUP BY.
+The group() command provides some of the same functionality as SQL's GROUP BY.
 Simpler than a map reduce you need to provide a key to group by, an initial
 value for the aggregation and a reduce function.
 
