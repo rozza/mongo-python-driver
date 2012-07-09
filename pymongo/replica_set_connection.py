@@ -34,6 +34,7 @@ attribute-style access:
 import datetime
 import socket
 import struct
+import sys
 import threading
 import time
 import warnings
@@ -73,29 +74,71 @@ def _partition_node(node):
     return host, port
 
 
+class Monitor(object):
+    """Base class for replica set monitors.
+    """
+    def __init__(self, rsc, interval, event_class):
+        self.rsc = weakref.proxy(rsc, self.shutdown)
+        self.interval = interval
+        self.event = event_class()
+
+    def shutdown(self, dummy):
+        """Signal the monitor to shutdown.
+        """
+        self.event.set()
+
+    def monitor(self):
+        """Run until the RSC is collected or an
+        unexpected error occurs.
+        """
+        while not self.event.isSet():
+            self.event.wait(self.interval)
+            if self.event.isSet():
+                break
+            try:
+                self.rsc.refresh()
+            except AutoReconnect:
+                pass
+            # RSC has been collected or there
+            # was an unexpected error.
+            except:
+                break
+
+
+class MonitorThread(Monitor, threading.Thread):
+    """Thread based replica set monitor.
+    """
+    def __init__(self, rsc, interval=5):
+        Monitor.__init__(self, rsc, interval, threading.Event)
+        threading.Thread.__init__(self)
+        self.setName("ReplicaSetMonitorThread")
+
+    def run(self):
+        """Override Thread's run method.
+        """
+        self.monitor()
+
+
 have_gevent = False
 try:
-    import gevent
     from gevent import Greenlet
+    from gevent.event import Event
     have_gevent = True
 
-    class GreenletMonitor(Greenlet):
-        def __init__(self, obj, interval=5):
+    class MonitorGreenlet(Monitor, Greenlet):
+        """Greenlet based replica set monitor.
+        """
+        def __init__(self, rsc, interval=5):
+            Monitor.__init__(self, rsc, interval, Event)
             Greenlet.__init__(self)
-            self.obj = weakref.proxy(obj)
-            self.interval = interval
 
+        # Don't override `run` in a Greenlet. Add _run instead.
+        # Refer to gevent's Greenlet docs and source for more
+        # information.
         def _run(self):
-            while True:
-                try:
-                    self.obj.refresh()
-                # The connection object has been
-                # collected so we should die.
-                except ReferenceError:
-                    break
-                except:
-                    pass
-                gevent.sleep(self.interval)
+            """Define Greenlet's _run method.
+            """
+            self.monitor()
 
 except ImportError:
     pass
@@ -126,6 +169,13 @@ class ReplicaSetConnection(common.BaseObject):
         <http://dochub.mongodb.org/core/connections>`_, in addition to
         a string of `host:port` pairs (e.g. 'host1:port1,host2:port2').
         If `hosts_or_uri` is None 'localhost:27017' will be used.
+
+        .. note:: Instances of :class:`~ReplicaSetConnection` start a
+           background task to monitor the state of the replica set. This allows
+           it to quickly respond to changes in replica set configuration.
+           Before discarding an instance of :class:`~ReplicaSetConnection` make
+           sure you call :meth:`~close` to ensure that the monitor task is
+           cleanly shut down.
 
         :Parameters:
           - `hosts_or_uri` (optional): A MongoDB URI or string of `host:port`
@@ -211,7 +261,6 @@ class ReplicaSetConnection(common.BaseObject):
         self.__pools = {}
         self.__index_cache = {}
         self.__auth_credentials = {}
-        self.__done = False
 
         self.__max_pool_size = common.validate_positive_integer(
                                         'max_pool_size', max_pool_size)
@@ -285,14 +334,6 @@ class ReplicaSetConnection(common.BaseObject):
 
         self.refresh()
 
-        if self.__opts.get('use_greenlets', False):
-            monitor = GreenletMonitor(self)
-        else:
-            monitor = threading.Thread(target=self.__refresh_loop)
-            monitor.setName("ReplicaSetMonitorThread")
-            monitor.setDaemon(True)
-        monitor.start()
-
         if db_name and username is None:
             warnings.warn("must provide a username and password "
                           "to authenticate to %s" % (db_name,))
@@ -301,24 +342,22 @@ class ReplicaSetConnection(common.BaseObject):
             if not self[db_name].authenticate(username, password):
                 raise ConfigurationError("authentication failed")
 
-    def __del__(self):
-        """Shutdown the monitor thread.
-        """
-        self.__done = True
+        # Start the monitor after we know the configuration is correct.
+        if self.__opts.get('use_greenlets', False):
+            self.__monitor = MonitorGreenlet(self)
+        else:
+            # NOTE: Don't ever make this a daemon thread in CPython. Daemon
+            # threads in CPython cause serious issues when the interpreter is
+            # torn down. Symptoms range from random exceptions to the
+            # interpreter dumping core.
+            self.__monitor = MonitorThread(self)
+            # Sadly, weakrefs aren't totally reliable in PyPy and Jython
+            # so use a daemon thread there.
+            if (sys.platform.startswith('java') or
+                'PyPy' in sys.version):
+                self.__monitor.setDaemon(True)
+        self.__monitor.start()
 
-    def __refresh_loop(self):
-        """Refresh loop used in the standard monitor thread.
-        """
-        while True:
-            if not self.__done:
-                try:
-                    self.refresh()
-                # Catch literally everything here to avoid
-                # exceptions when the interpreter shuts down.
-                except:
-                    pass
-                if time:
-                    time.sleep(5)
 
     def _cached(self, dbname, coll, index):
         """Test if `index` is cached.
@@ -525,16 +564,20 @@ class ReplicaSetConnection(common.BaseObject):
     def __is_master(self, host):
         """Directly call ismaster.
         """
-        pool = self.pool_class(host, self.__max_pool_size,
-                               self.__net_timeout, self.__conn_timeout,
-                               self.__use_ssl)
-        sock_info = pool.get_socket()
-        response = self.__simple_command(
-            sock_info, 'admin', {'ismaster': 1}
-        )
+        mpool = self.pool_class(host, self.__max_pool_size,
+                                self.__net_timeout, self.__conn_timeout,
+                                self.__use_ssl)
+        sock_info = mpool.get_socket()
+        try:
+            response = self.__simple_command(
+                sock_info, 'admin', {'ismaster': 1}
+            )
 
-        pool.maybe_return_socket(sock_info)
-        return response, pool
+            mpool.maybe_return_socket(sock_info)
+            return response, mpool
+        except (ConnectionFailure, socket.error):
+            mpool.discard_socket(sock_info)
+            raise
 
     def __update_pools(self):
         """Update the mapping of (host, port) pairs to connection pools.
@@ -585,7 +628,7 @@ class ReplicaSetConnection(common.BaseObject):
                                                      {'ismaster': 1})
                     mongo['pool'].maybe_return_socket(sock_info)
                 else:
-                    response, conn = self.__is_master(node)
+                    response, _ = self.__is_master(node)
 
                 # Check that this host is part of the given replica set.
                 set_name = response.get('setName')
@@ -679,12 +722,12 @@ class ReplicaSetConnection(common.BaseObject):
     def __socket(self, mongo):
         """Get a SocketInfo from the pool.
         """
-        pool = mongo['pool']
+        mpool = mongo['pool']
         if self.__auto_start_request:
             # No effect if a request already started
             self.start_request()
 
-        sock_info = pool.get_socket()
+        sock_info = mpool.get_socket()
 
         if self.__auth_credentials:
             self.__check_auth(sock_info)
@@ -699,8 +742,20 @@ class ReplicaSetConnection(common.BaseObject):
         self.__writer = None
 
     def close(self):
-        """Disconnect from all set members.
+        """Close this ReplicaSetConnection.
+
+        This method first terminates the replica set monitor, then disconnects
+        from all members of the replica set. Once called this instance of
+        ReplicaSetConnection should not be reused.
+
+        .. versionchanged:: 2.2.1
+           The :meth:`~close` method now terminates the replica set monitor.
         """
+        if self.__monitor:
+            self.__monitor.shutdown(None)
+            # Use a reasonable timeout.
+            self.__monitor.join(1.0)
+            self.__monitor = None
         self.__writer = None
         self.__pools = {}
 
