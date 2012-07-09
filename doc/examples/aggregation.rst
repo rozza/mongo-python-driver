@@ -1,15 +1,15 @@
-Aggregation Framework Example
-=============================
+Aggregation Examples
+====================
+
+There are various methods of performing aggregations in MongoDB.  These
+examples cover the new aggregation framework, using map reduce and using the
+group method.
 
 .. testsetup::
 
   from pymongo import Connection
   connection = Connection()
   connection.drop_database('aggregation_example')
-
-This example shows how to use the
-:meth:`~pymongo.collection.Collection.aggregate` method to use the aggregation
-framework.
 
 .. note::
 
@@ -38,10 +38,13 @@ aggregations on:
 Aggregation Framework
 ---------------------
 
-Now we'll perform a simple aggregation to count the number of occurrences
-for each tag in the ``tags`` array, across the entire collection.  To achieve
-this we need to pass in two operations to the pipeline.  First, we need to
-unwind the ``tags`` array and then group by the tags and sum them up.
+This example shows how to use the
+:meth:`~pymongo.collection.Collection.aggregate` method to use the aggregation
+framework.  We'll perform a simple aggregation to count the number of
+occurrences for each tag in the ``tags`` array, across the entire collection.
+To achieve this we need to pass in two operations to the pipeline.
+First, we need to unwind the ``tags`` array and then group by the tags and
+sum them up.
 
 .. doctest::
 
@@ -157,13 +160,18 @@ different database to store the result collection:
 Group
 -----
 
-The group() command provides some of the same functionality as SQL's GROUP BY.
-Simpler than a map reduce you need to provide a key to group by, an initial
-value for the aggregation and a reduce function.
+The :meth:`~pymongo.collection.Collection.group` method provides some of the
+same functionality as SQL's GROUP BY.  Simpler than a map reduce you need to
+provide a key to group by, an initial value for the aggregation and a
+reduce function.
 
-Here we are doing a simple group and count of the `x` values:
+.. note:: Doesn't work with sharded MongoDB configurations, use aggregation or
+          map/reduce instead of group().
+
+Here we are doing a simple group and count of the occurrences ``x`` values:
 
 .. doctest::
+
   >>> reducer = Code("""
   ...                function(obj, prev){
   ...                  prev.count++;
@@ -177,8 +185,5 @@ Here we are doing a simple group and count of the `x` values:
   {u'count': 1.0, u'x': 1.0}
   {u'count': 2.0, u'x': 2.0}
   {u'count': 1.0, u'x': 3.0}
-
-Note: Doesn't work with sharded MongoDB configurations, use aggregation or
-map/reduce instead of group().
 
 .. seealso:: The full list of options for MongoDB's `group method <http://www.mongodb.org/display/DOCS/Aggregation#Aggregation-Group>`_
