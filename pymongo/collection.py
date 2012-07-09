@@ -889,7 +889,7 @@ class Collection(common.BaseObject):
 
         return options
 
-    def aggregate(self, ops=None, full_response=False):
+    def aggregate(self, ops=None):
         """Perform an aggregation using the aggregation framework on this
         collection.
 
@@ -899,8 +899,6 @@ class Collection(common.BaseObject):
 
         :Parameters:
           - `pipeline`: a single command or list of aggregation commands
-          - `full_response` (optional): if ``True``, return full response to
-            this command - otherwise just return the result
 
         .. note:: Requires server version **>= 2.1.1**
 
@@ -911,19 +909,12 @@ class Collection(common.BaseObject):
         """
         if not isinstance(ops, (dict, list, tuple)):
             raise TypeError("pipeline must be a dict, list or tuple")
-        if not isinstance(full_response, bool):
-            raise TypeError("full_response must be an instance of bool")
 
         if isinstance(ops, dict):
             ops = [ops]
 
-        res = self.__database.command("aggregate", self.__name,
-                                      pipeline=ops)
+        return = self.__database.command("aggregate", self.__name, pipeline=ops)
 
-        if not full_response:
-            res = res.get("result")
-
-        return res
 
     # TODO key and condition ought to be optional, but deprecation
     # could be painful as argument order would have to change.

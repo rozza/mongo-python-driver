@@ -1061,14 +1061,6 @@ class TestCollection(unittest.TestCase):
         self.assertEqual(expected['result'], db.test.aggregate([ops]))
         self.assertEqual(expected['result'], db.test.aggregate((ops,)))
 
-        self.assertEqual(expected,
-                         db.test.aggregate(ops, full_response=True))
-        self.assertEqual(expected,
-                         db.test.aggregate([ops], full_response=True))
-
-        result = db.test.aggregate(ops, full_response=False)
-        self.assertTrue(isinstance(result, list))
-
     def test_group(self):
         db = self.db
         db.drop_collection("test")
