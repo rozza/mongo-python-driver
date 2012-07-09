@@ -1054,23 +1054,19 @@ class TestCollection(unittest.TestCase):
 
         self.assertRaises(TypeError, db.test.aggregate, "wow")
         self.assertRaises(TypeError, db.test.aggregate, [], 1)
-        self.assertRaises(TypeError, db.test.aggregate, [], True, 1)
 
-        pipeline = {"$project": {"_id": False, "foo": True}}
+        ops = {"$project": {"_id": False, "foo": True}}
         expected = {'ok': 1.0, 'result': [{'foo': [1, 2]}]}
-        self.assertEqual(expected['result'], db.test.aggregate(pipeline))
-        self.assertEqual(expected['result'], db.test.aggregate([pipeline]))
-        self.assertEqual(expected['result'], db.test.aggregate((pipeline,)))
+        self.assertEqual(expected['result'], db.test.aggregate(ops))
+        self.assertEqual(expected['result'], db.test.aggregate([ops]))
+        self.assertEqual(expected['result'], db.test.aggregate((ops,)))
 
         self.assertEqual(expected,
-                         db.test.aggregate(pipeline, full_response=True))
+                         db.test.aggregate(ops, full_response=True))
         self.assertEqual(expected,
-                         db.test.aggregate([pipeline], full_response=True))
+                         db.test.aggregate([ops], full_response=True))
 
-        result = db.test.aggregate(pipeline, explain=True, full_response=True)
-        self.assertTrue('serverPipeline' in result)
-
-        result = db.test.aggregate(pipeline, explain=True, full_response=False)
+        result = db.test.aggregate(ops, full_response=False)
         self.assertTrue(isinstance(result, list))
 
     def test_group(self):

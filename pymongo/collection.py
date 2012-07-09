@@ -889,7 +889,7 @@ class Collection(common.BaseObject):
 
         return options
 
-    def aggregate(self, pipeline, explain=False, full_response=False):
+    def aggregate(self, ops=None, full_response=False):
         """Perform an aggregation using the aggregation framework on this
         collection.
 
@@ -901,7 +901,6 @@ class Collection(common.BaseObject):
           - `pipeline`: a single command or list of aggregation commands
           - `full_response` (optional): if ``True``, return full response to
             this command - otherwise just return the result
-          - `explain` - return explain plan for the aggregation
 
         .. note:: Requires server version **>= 2.1.1**
 
@@ -910,21 +909,19 @@ class Collection(common.BaseObject):
         .. _aggregate command:
             http://docs.mongodb.org/manual/applications/aggregation
         """
-        if not isinstance(pipeline, (dict, list, tuple)):
+        if not isinstance(ops, (dict, list, tuple)):
             raise TypeError("pipeline must be a dict, list or tuple")
         if not isinstance(full_response, bool):
             raise TypeError("full_response must be an instance of bool")
-        if not isinstance(explain, bool):
-            raise TypeError("explain must be an instance of bool")
 
-        if isinstance(pipeline, dict):
-            pipeline = [pipeline]
+        if isinstance(ops, dict):
+            ops = [ops]
 
         res = self.__database.command("aggregate", self.__name,
-                                      pipeline=pipeline, explain=explain)
+                                      pipeline=ops)
 
         if not full_response:
-            res = res.get("serverPipeline") if explain else res.get("result")
+            res = res.get("result")
 
         return res
 

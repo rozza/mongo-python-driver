@@ -20,7 +20,7 @@ framework.
 Setup
 -----
 To start, we'll insert some example data which we can perform
-aggregation pipelines on:
+aggregations on:
 
 .. doctest::
 
@@ -30,13 +30,13 @@ aggregation pipelines on:
   ObjectId('...')
   >>> db.things.insert({"x": 2, "tags": ["cat"]})
   ObjectId('...')
-  >>> db.things.insert({"x": 3, "tags": ["mouse", "cat", "dog"]})
+  >>> db.things.insert({"x": 2, "tags": ["mouse", "cat", "dog"]})
   ObjectId('...')
-  >>> db.things.insert({"x": 4, "tags": []})
+  >>> db.things.insert({"x": 3, "tags": []})
   ObjectId('...')
 
-Basic Aggregation Pipeline
---------------------------
+Aggregation Framework
+---------------------
 
 Now we'll perform a simple aggregation to count the number of occurrences
 for each tag in the ``tags`` array, across the entire collection.  To achieve
@@ -64,3 +64,121 @@ sub-fields into the top-level of results.
 
 .. seealso:: The full documentation for MongoDB's `aggregation framework
     <http://docs.mongodb.org/manual/applications/aggregation>`_
+
+Map/Reduce
+----------
+
+Another option for aggregation is to use the map reduce framework.  Here we
+will define **map** and **reduce** functions to also count he number of
+occurrences for each tag in the ``tags`` array, across the entire collection.
+
+Our **map** function just emits a single `(key, 1)` pair for each tag in
+the array:
+
+.. doctest::
+
+  >>> from bson.code import Code
+  >>> mapper = Code("""
+  ...               function () {
+  ...                 this.tags.forEach(function(z) {
+  ...                   emit(z, 1);
+  ...                 });
+  ...               }
+  ...               """)
+
+The **reduce** function sums over all of the emitted values for a given key:
+
+.. doctest::
+
+  >>> reducer = Code("""
+  ...                function (key, values) {
+  ...                  var total = 0;
+  ...                  for (var i = 0; i < values.length; i++) {
+  ...                    total += values[i];
+  ...                  }
+  ...                  return total;
+  ...                }
+  ...                """)
+
+.. note:: We can't just return ``values.length`` as the **reduce** function
+   might be called iteratively on the results of other reduce steps.
+
+Finally, we call :meth:`~pymongo.collection.Collection.map_reduce` and
+iterate over the result collection:
+
+.. doctest::
+
+  >>> result = db.things.map_reduce(mapper, reducer, "myresults")
+  >>> for doc in result.find():
+  ...   print doc
+  ...
+  {u'_id': u'cat', u'value': 3.0}
+  {u'_id': u'dog', u'value': 2.0}
+  {u'_id': u'mouse', u'value': 1.0}
+
+Advanced Map/Reduce
+-------------------
+
+PyMongo's API supports all of the features of MongoDB's map/reduce engine.
+One interesting feature is the ability to get more detailed results when
+desired, by passing `full_response=True` to
+:meth:`~pymongo.collection.Collection.map_reduce`. This returns the full
+response to the map/reduce command, rather than just the result collection:
+
+.. doctest::
+
+  >>> db.things.map_reduce(mapper, reducer, "myresults", full_response=True)
+  {u'counts': {u'input': 4, u'reduce': 2, u'emit': 6, u'output': 3}, u'timeMillis': ..., u'ok': ..., u'result': u'...'}
+
+All of the optional map/reduce parameters are also supported, simply pass them
+as keyword arguments. In this example we use the `query` parameter to limit the
+documents that will be mapped over:
+
+.. doctest::
+
+  >>> result = db.things.map_reduce(mapper, reducer, "myresults", query={"x": {"$lt": 2}})
+  >>> for doc in result.find():
+  ...   print doc
+  ...
+  {u'_id': u'cat', u'value': 1.0}
+  {u'_id': u'dog', u'value': 1.0}
+
+With MongoDB 1.8.0 or newer you can use :class:`~bson.son.SON` to specify a
+different database to store the result collection:
+
+.. doctest::
+
+  >>> from bson.son import SON
+  >>> db.things.map_reduce(mapper, reducer, out=SON([("replace", "results"), ("db", "outdb")]), full_response=True)
+  {u'counts': {u'input': 4, u'reduce': 2, u'emit': 6, u'output': 3}, u'timeMillis': ..., u'ok': ..., u'result': {u'db': ..., u'collection': ...}}
+
+.. seealso:: The full list of options for MongoDB's `map reduce engine <http://www.mongodb.org/display/DOCS/MapReduce>`_
+
+Group
+-----
+
+The group() command provides some of the same functionality as SQL’s GROUP BY.
+Simpler than a map reduce you need to provide a key to group by, an initial
+value for the aggregation and a reduce function.
+
+Here we are doing a simple group and count of the `x` values:
+
+.. doctest::
+  >>> reducer = Code("""
+  ...                function(obj, prev){
+  ...                  prev.count++;
+  ...                }
+  ...                """)
+  ...
+  >>> from bson.son import SON
+  >>> results = db.things.group(key={"x":1}, condition={}, initial={"count": 0}, reduce=reducer))
+  >>> for doc in results:
+  ...   print doc
+  {u'count': 1.0, u'x': 1.0}
+  {u'count': 2.0, u'x': 2.0}
+  {u'count': 1.0, u'x': 3.0}
+
+Note: Doesn't work with sharded MongoDB configurations, use aggregation or
+map/reduce instead of group().
+
+.. seealso:: The full list of options for MongoDB's `group method <http://www.mongodb.org/display/DOCS/Aggregation#Aggregation-Group>`_
