@@ -1057,9 +1057,9 @@ class TestCollection(unittest.TestCase):
 
         ops = {"$project": {"_id": False, "foo": True}}
         expected = {'ok': 1.0, 'result': [{'foo': [1, 2]}]}
-        self.assertEqual(expected['result'], db.test.aggregate(ops))
-        self.assertEqual(expected['result'], db.test.aggregate([ops]))
-        self.assertEqual(expected['result'], db.test.aggregate((ops,)))
+        self.assertEqual(expected, db.test.aggregate(ops))
+        self.assertEqual(expected, db.test.aggregate([ops]))
+        self.assertEqual(expected, db.test.aggregate((ops,)))
 
     def test_group(self):
         db = self.db
