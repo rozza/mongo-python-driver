@@ -214,6 +214,11 @@ class WriteConcern(dict):
         key, value = validate(key, value)
         super(WriteConcern, self).__setitem__(key, value)
 
+    def _call_get_last_error(self):
+        for k, v in self.iteritems():
+            if k != "w" or v != 0:
+                return True
+        return False
 
 class BaseObject(object):
     """A base class that provides attributes and methods common
@@ -548,7 +553,6 @@ class BaseObject(object):
 
         # Fall back to collection level defaults.
         # w=0 takes precedence over self.safe = True
-        if self.safe and self.__write_concern.get('w') != 0:
+        if self.safe or self.__write_concern._call_get_last_error():
             return True, pop1(self.__write_concern.copy())
-
         return False, {}
