@@ -98,8 +98,18 @@ class InvalidURI(ConfigurationError):
     .. versionadded:: 1.5
     """
 
+
 class UnsupportedOption(ConfigurationError):
     """Exception for unsupported options.
 
     .. versionadded:: 2.0
     """
+
+try:
+    from ssl import CertificateError
+except:
+    class CertificateError(ValueError):
+        """Exception for invalid SSL certificates.
+
+        .. versionadded:: 2.4+
+        """

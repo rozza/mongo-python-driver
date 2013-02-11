@@ -63,6 +63,24 @@ def validate_positive_integer(option, value):
     return val
 
 
+def validate_cert_reqs(option, value):
+    """Validate the cert reqs are valid. It must be None or one of the three
+    values ``ssl.CERT_NONE``, ``ssl.CERT_OPTIONAL`` or ``ssl.CERT_REQUIRED``"""
+    if value is None:
+        return value
+    try:
+        import ssl
+        if value in (ssl.CERT_NONE, ssl.CERT_OPTIONAL, ssl.CERT_REQUIRED):
+            return value
+        raise ConfigurationError("The value of %s must be one of: "
+                                 "`ssl.CERT_NONE`, `ssl.CERT_OPTIONAL` or "
+                                 "`ssl.CERT_REQUIRED" % (option,))
+    except ImportError:
+        raise ConfigurationError("The value of %s is set but can't be "
+                                 "validated. The ssl module is not available"
+                                 % (option,))
+
+
 def validate_positive_integer_or_none(option, value):
     """Validate that 'value' is a positive integer or None.
     """
@@ -78,6 +96,18 @@ def validate_basestring(option, value):
         return value
     raise TypeError("Wrong type for %s, value must be an "
                     "instance of %s" % (option, basestring.__name__))
+
+
+def validate_readable(option, value):
+    """Validates that 'value' is file-like and readable.
+    """
+    value = validate_basestring(option, value)
+    try:
+        f = open(value, 'r')
+        f.close()
+        return value
+    except IOError:
+        raise TypeError("%s cannot be found or is not readable." % option)
 
 
 def validate_int_or_basestring(option, value):
@@ -180,6 +210,10 @@ VALIDATORS = {
     'connecttimeoutms': validate_timeout_or_none,
     'sockettimeoutms': validate_timeout_or_none,
     'ssl': validate_boolean,
+    'ssl_keyfile': validate_readable,
+    'ssl_certfile': validate_readable,
+    'ssl_cert_reqs': validate_cert_reqs,
+    'ssl_ca_certs': validate_readable,
     'readpreference': validate_read_preference,
     'read_preference': validate_read_preference,
     'tag_sets': validate_tag_sets,

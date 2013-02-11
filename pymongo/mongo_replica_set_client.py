@@ -369,7 +369,26 @@ class MongoReplicaSetClient(common.BaseObject):
             precedence.
           - `port`: For compatibility with :class:`~mongo_client.MongoClient`.
             The default port number to use for hosts.
+          - `ssl_keyfile`: The private keyfile used to identify the local
+            connection against mongod.  If included with the ``certfile` then
+            only the ``ssl_certfile`` is needed.  Requires ``ssl=True``.
+          - `ssl_certfile`: The certificate file used to identify the local
+            connection against mongod. Requires ``ssl=True``.
+          - `ssl_cert_reqs`: Specifies whether a certificate is required from
+            the other side of the connection, and whether it will be validated
+            if provided. It must be one of the three values ``ssl.CERT_NONE``
+            (certificates ignored), ``ssl.CERT_OPTIONAL``
+            (not required, but validated if provided), or ``ssl.CERT_REQUIRED``
+            (required and validated). If the value of this parameter is not
+            ``ssl.CERT_NONE``, then the ``ssl_ca_certs`` parameter must point
+            to a file of CA certificates. Requires ``ssl=True``.
+          - `ssl_ca_certs`: The ca_certs file contains a set of concatenated
+            "certification authority" certificates, which are used to validate
+            certificates passed from the other end of the connection.
+            Requires ``ssl=True``.
 
+        .. versionchanged:: 2.4+
+           Added addtional ssl options
         .. versionadded:: 2.4
         """
         self.__opts = {}
@@ -437,15 +456,32 @@ class MongoReplicaSetClient(common.BaseObject):
             raise ConfigurationError("the replicaSet "
                                      "keyword parameter is required.")
 
-
         self.__net_timeout = self.__opts.get('sockettimeoutms')
         self.__conn_timeout = self.__opts.get('connecttimeoutms')
         self.__use_ssl = self.__opts.get('ssl', False)
+        self.__ssl_keyfile = self.__opts.get('ssl_keyfile', None)
+        self.__ssl_certfile = self.__opts.get('ssl_certfile', None)
+        self.__ssl_cert_reqs = self.__opts.get('ssl_cert_reqs', None)
+        self.__ssl_ca_certs = self.__opts.get('ssl_ca_certs', None)
+
         if self.__use_ssl and not pool.have_ssl:
             raise ConfigurationError("The ssl module is not available. If you "
                                      "are using a python version previous to "
                                      "2.6 you must install the ssl package "
                                      "from PyPI.")
+
+        ssl_kwarg_keys = [k for k in kwargs.keys() if k.startswith('ssl_')]
+        if not self.__use_ssl and ssl_kwarg_keys:
+            raise ConfigurationError("ssl has not been enabled but the "
+                                     "following ssl parameters have been set: "
+                                     "%s. Please set `ssl=True` or remove."
+                                     % ', '.join(ssl_kwarg_keys))
+
+        if self.__ssl_cert_reqs and not self.__ssl_ca_certs:
+                raise ConfigurationError("If `ssl_cert_reqs` is not "
+                                         "`ssl.CERT_NONE` then you must "
+                                         "include `ssl_ca_certs` to be able "
+                                         "to validate the server.")
 
         super(MongoReplicaSetClient, self).__init__(**self.__opts)
         if self.slave_okay:
@@ -715,8 +751,16 @@ class MongoReplicaSetClient(common.BaseObject):
            Returns (response, connection_pool, ping_time in seconds).
         """
         connection_pool = self.pool_class(
-            host, self.__max_pool_size, self.__net_timeout, self.__conn_timeout,
-            self.__use_ssl, use_greenlets=self.__use_greenlets)
+            host,
+            self.__max_pool_size,
+            self.__net_timeout,
+            self.__conn_timeout,
+            self.__use_ssl,
+            use_greenlets=self.__use_greenlets,
+            ssl_keyfile=self.__ssl_keyfile,
+            ssl_certfile=self.__ssl_certfile,
+            ssl_cert_reqs=self.__ssl_cert_reqs,
+            ssl_ca_certs=self.__ssl_ca_certs)
 
         if self.in_request():
             connection_pool.start_request()

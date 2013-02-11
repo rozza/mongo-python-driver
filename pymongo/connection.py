@@ -135,8 +135,28 @@ class Connection(MongoClient):
             until :meth:`end_request()`
           - `slave_okay` or `slaveOk` (deprecated): Use `read_preference`
             instead.
+          - `ssl_keyfile`: The private keyfile used to identify the local
+            connection against mongod.  If included with the ``certfile` then
+            only the ``ssl_certfile`` is needed.  Requires ``ssl=True``.
+          - `ssl_certfile`: The certificate file used to identify the local
+            connection against mongod. Requires ``ssl=True``.
+          - `ssl_cert_reqs`: The parameter cert_reqs specifies whether a
+            certificate is required from the other side of the connection,
+            and whether it will be validated if provided. It must be one of the
+            three values ``ssl.CERT_NONE`` (certificates ignored),
+            ``ssl.CERT_OPTIONAL`` (not required, but validated if provided), or
+            ``ssl.CERT_REQUIRED`` (required and validated). If the value of
+            this parameter is not ``ssl.CERT_NONE``, then the ``ssl_ca_certs``
+            parameter must point to a file of CA certificates.
+            Requires ``ssl=True``.
+          - `ssl_ca_certs`: The ca_certs file contains a set of concatenated
+            "certification authority" certificates, which are used to validate
+            certificates passed from the other end of the connection.
+            Requires ``ssl=True``.
 
         .. seealso:: :meth:`end_request`
+        .. versionchanged:: 2.4+
+           Added addtional ssl options
         .. versionchanged:: 2.3
            Added support for failover between mongos seed list members.
         .. versionchanged:: 2.2

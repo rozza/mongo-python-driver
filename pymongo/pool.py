@@ -19,15 +19,16 @@ import time
 import threading
 import weakref
 
-from pymongo import thread_util
-from pymongo.errors import ConnectionFailure, ConfigurationError
-
-
 have_ssl = True
 try:
     import ssl
 except ImportError:
     have_ssl = False
+
+from pymongo import thread_util
+from pymongo.errors import (CertificateError, ConnectionFailure,
+                            ConfigurationError)
+from pymongo.helpers import match_hostname
 
 
 NO_REQUEST    = None
@@ -96,7 +97,8 @@ class SocketInfo(object):
 # http://bugs.jython.org/issue1057
 class Pool:
     def __init__(self, pair, max_size, net_timeout, conn_timeout, use_ssl,
-                 use_greenlets):
+                 use_greenlets, ssl_keyfile=None, ssl_certfile=None,
+                 ssl_cert_reqs=None, ssl_ca_certs=None):
         """
         :Parameters:
           - `pair`: a (hostname, port) tuple
@@ -107,6 +109,23 @@ class Pool:
           - `use_greenlets`: bool, if True then start_request() assigns a
               socket to the current greenlet - otherwise it is assigned to the
               current thread
+          - `ssl_keyfile`: The private keyfile used to identify the local
+            connection against mongod.  If included with the ``certfile` then
+            only the ``ssl_certfile`` is needed.  Requires ``ssl=True``.
+          - `ssl_certfile`: The certificate file used to identify the local
+            connection against mongod. Requires ``ssl=True``.
+          - `ssl_cert_reqs`: Specifies whether a certificate is required from
+            the other side of the connection, and whether it will be validated
+            if provided. It must be one of the three values ``ssl.CERT_NONE``
+            (certificates ignored), ``ssl.CERT_OPTIONAL``
+            (not required, but validated if provided), or ``ssl.CERT_REQUIRED``
+            (required and validated). If the value of this parameter is not
+            ``ssl.CERT_NONE``, then the ``ssl_ca_certs`` parameter must point
+            to a file of CA certificates. Requires ``ssl=True``.
+          - `ssl_ca_certs`: The ca_certs file contains a set of concatenated
+            "certification authority" certificates, which are used to validate
+            certificates passed from the other end of the connection.
+            Requires ``ssl=True``.
         """
         if use_greenlets and not thread_util.have_greenlet:
             raise ConfigurationError(
@@ -126,6 +145,11 @@ class Pool:
         self.net_timeout = net_timeout
         self.conn_timeout = conn_timeout
         self.use_ssl = use_ssl
+        self.ssl_keyfile = ssl_keyfile
+        self.ssl_certfile = ssl_certfile
+        self.ssl_cert_reqs = ssl_cert_reqs
+        self.ssl_ca_certs = ssl_ca_certs
+
         self._ident = thread_util.create_ident(use_greenlets)
 
         # Map self._ident.get() -> request socket
@@ -212,9 +236,29 @@ class Pool:
         """
         sock = self.create_connection(pair)
 
-        if self.use_ssl:
+        if self.use_ssl and have_ssl:
+            options = {}
+            if self.ssl_certfile:
+                options['certfile'] = self.ssl_certfile
+            if self.ssl_keyfile:
+                options['keyfile'] = self.ssl_keyfile
+            if self.ssl_ca_certs:
+                options['ca_certs'] = self.ssl_ca_certs
+            if self.ssl_cert_reqs:
+                options['cert_reqs'] = self.ssl_cert_reqs
             try:
-                sock = ssl.wrap_socket(sock)
+                sock = ssl.wrap_socket(sock, **options)
+                if options.get('cert_reqs', None):
+                    hostname = ''
+                    if self.pair:
+                        hostname = self.pair[0]
+                    elif pair:
+                        hostname = pair[0]
+                    try:
+                        match_hostname(sock.getpeercert(), hostname)
+                    except CertificateError, e:
+                        raise ConnectionFailure("SSL certificate validation "
+                                                "failed: %s" % e)
             except ssl.SSLError:
                 sock.close()
                 raise ConnectionFailure("SSL handshake failed. MongoDB may "

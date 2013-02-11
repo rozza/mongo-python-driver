@@ -60,6 +60,8 @@ from pymongo.errors import (AutoReconnect,
 
 EMPTY = b("")
 
+
+
 def _partition_node(node):
     """Split a host:port string returned from mongod/s into
     a (host, int(port)) pair needed for socket.connect().
@@ -163,11 +165,30 @@ class MongoClient(common.BaseObject):
           - `use_greenlets`: If ``True``, :meth:`start_request()` will ensure
             that the current greenlet uses the same socket for all
             operations until :meth:`end_request()`
+          - `ssl_keyfile`: The private keyfile used to identify the local
+            connection against mongod.  If included with the ``certfile` then
+            only the ``ssl_certfile`` is needed.  Requires ``ssl=True``.
+          - `ssl_certfile`: The certificate file used to identify the local
+            connection against mongod. Requires ``ssl=True``.
+          - `ssl_cert_reqs`: Specifies whether a certificate is required from
+            the other side of the connection, and whether it will be validated
+            if provided. It must be one of the three values ``ssl.CERT_NONE``
+            (certificates ignored), ``ssl.CERT_OPTIONAL``
+            (not required, but validated if provided), or ``ssl.CERT_REQUIRED``
+            (required and validated). If the value of this parameter is not
+            ``ssl.CERT_NONE``, then the ``ssl_ca_certs`` parameter must point
+            to a file of CA certificates. Requires ``ssl=True``.
+          - `ssl_ca_certs`: The ca_certs file contains a set of concatenated
+            "certification authority" certificates, which are used to validate
+            certificates passed from the other end of the connection.
+            Requires ``ssl=True``.
 
         .. seealso:: :meth:`end_request`
 
         .. mongodoc:: connections
 
+        .. versionchanged:: 2.4+
+           Added addtional ssl options
         .. versionadded:: 2.4
         """
         if host is None:
@@ -233,11 +254,29 @@ class MongoClient(common.BaseObject):
         self.__net_timeout = options.get('sockettimeoutms')
         self.__conn_timeout = options.get('connecttimeoutms')
         self.__use_ssl = options.get('ssl', False)
+        self.__ssl_keyfile = options.get('ssl_keyfile', None)
+        self.__ssl_certfile = options.get('ssl_certfile', None)
+        self.__ssl_cert_reqs = options.get('ssl_cert_reqs', None)
+        self.__ssl_ca_certs = options.get('ssl_ca_certs', None)
+
         if self.__use_ssl and not pool.have_ssl:
             raise ConfigurationError("The ssl module is not available. If you "
                                      "are using a python version previous to "
                                      "2.6 you must install the ssl package "
                                      "from PyPI.")
+
+        ssl_kwarg_keys = [k for k in kwargs.keys() if k.startswith('ssl_')]
+        if not self.__use_ssl and ssl_kwarg_keys:
+            raise ConfigurationError("ssl has not been enabled but the "
+                                     "following ssl parameters have been set: "
+                                     "%s. Please set `ssl=True` or remove."
+                                     % ', '.join(ssl_kwarg_keys))
+
+        if self.__ssl_cert_reqs and not self.__ssl_ca_certs:
+                raise ConfigurationError("If `ssl_cert_reqs` is not "
+                                         "`ssl.CERT_NONE` then you must "
+                                         "include `ssl_ca_certs` to be able "
+                                         "to validate the server.")
 
         self.__use_greenlets = options.get('use_greenlets', False)
         self.__pool = pool_class(
@@ -246,7 +285,11 @@ class MongoClient(common.BaseObject):
             self.__net_timeout,
             self.__conn_timeout,
             self.__use_ssl,
-            use_greenlets=self.__use_greenlets)
+            use_greenlets=self.__use_greenlets,
+            ssl_keyfile=self.__ssl_keyfile,
+            ssl_certfile=self.__ssl_certfile,
+            ssl_cert_reqs=self.__ssl_cert_reqs,
+            ssl_ca_certs=self.__ssl_ca_certs)
 
         self.__document_class = document_class
         self.__tz_aware = common.validate_boolean('tz_aware', tz_aware)
